@@ -1,0 +1,833 @@
+<title>Localizador WiFi QA-kNN</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Sans+3:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: banco de pruebas de RF — una barra de lecturas clave arriba, el plano como instrumento principal
+   con su panel de control al lado, y debajo paneles de análisis en rejilla. */
+:root {
+  --bg: #eef3f4; --surface: #ffffff; --surface-2: #f6f9fa; --ink: #10212b; --ink-2: #44555f; --muted: #75858d;
+  --line: #d6e0e4; --grid: #e4ebee; --accent: #0b7a75; --accent-ink: #ffffff; --accent-soft: #dcefed;
+  --good: #1a7f37; --good-soft: #e1f3e5; --warn: #9a6700; --warn-soft: #fbefd2; --crit: #c42b2b; --crit-soft: #fbe3e1;
+  --zona-aula: #e8f0f8; --zona-corr: #f1f0ea; --zona-ofic: #e4f3ee; --muro: #44555f; --tabique: #9aa8ae;
+  --ap: #d93a3a; --ap-off: #9aa8ae; --pred: #2a78d6; --real: #10212b;
+  --m-knn: #2a78d6; --m-nb: #eb6834; --m-ridge: #1baf7a; --m-lasso: #008300; --m-lda: #eda100; --m-qda: #e87ba4; --m-base: #898781;
+  --r-cruda: #898781; --r-media: #eb6834; --r-mediana: #1baf7a; --r-cuart: #2a78d6;
+  --f-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --f-body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0c1215; --surface: #131c20; --surface-2: #18232a; --ink: #e4edf0; --ink-2: #a9b9c0; --muted: #77898f;
+  --line: #24323a; --grid: #1d2a31; --accent: #3cc3b8; --accent-ink: #062523; --accent-soft: #123331;
+  --good: #4cc26a; --good-soft: #15301d; --warn: #e3b341; --warn-soft: #33290f; --crit: #ff7b72; --crit-soft: #3a1a19;
+  --zona-aula: #172634; --zona-corr: #22251f; --zona-ofic: #15302a; --muro: #a9b9c0; --tabique: #4c5c63;
+  --ap: #ff6b6b; --ap-off: #4c5c63; --pred: #5598e7; --real: #e4edf0;
+  --m-knn: #3987e5; --m-nb: #d95926; --m-ridge: #199e70; --m-lasso: #2fa33a; --m-lda: #c98500; --m-qda: #d55181; --m-base: #898781;
+  --r-cruda: #898781; --r-media: #d95926; --r-mediana: #199e70; --r-cuart: #3987e5;
+  color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0c1215; --surface: #131c20; --surface-2: #18232a; --ink: #e4edf0; --ink-2: #a9b9c0; --muted: #77898f;
+  --line: #24323a; --grid: #1d2a31; --accent: #3cc3b8; --accent-ink: #062523; --accent-soft: #123331;
+  --good: #4cc26a; --good-soft: #15301d; --warn: #e3b341; --warn-soft: #33290f; --crit: #ff7b72; --crit-soft: #3a1a19;
+  --zona-aula: #172634; --zona-corr: #22251f; --zona-ofic: #15302a; --muro: #a9b9c0; --tabique: #4c5c63;
+  --ap: #ff6b6b; --ap-off: #4c5c63; --pred: #5598e7; --real: #e4edf0;
+  --m-knn: #3987e5; --m-nb: #d95926; --m-ridge: #199e70; --m-lasso: #2fa33a; --m-lda: #c98500; --m-qda: #d55181; --m-base: #898781;
+  --r-cruda: #898781; --r-media: #d95926; --r-mediana: #199e70; --r-cuart: #3987e5;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--f-body); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
+.envoltura { max-width: 1280px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+.mono, .num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Barra superior */
+.barra { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line); }
+.barra .envoltura { display: flex; align-items: center; gap: 20px; padding-block: 10px; flex-wrap: wrap; }
+.marca { display: flex; align-items: center; gap: 10px; }
+.marca svg { flex: none; }
+.marca h1 { font-size: 18px; font-weight: 800; }
+.marca small { display: block; color: var(--muted); font-size: 12px; font-weight: 500; letter-spacing: 0.02em; }
+.nav { display: flex; gap: 4px; margin-left: auto; flex-wrap: wrap; }
+.nav a { color: var(--ink-2); text-decoration: none; font-weight: 600; font-size: 14px; padding: 6px 12px; border-radius: 999px; }
+.nav a:hover { background: var(--accent-soft); color: var(--ink); }
+
+/* Lecturas clave */
+.kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; margin-block: 20px 8px; }
+.kpi { background: var(--surface); padding: 14px 16px; min-width: 0; }
+.kpi .v { font-family: var(--f-mono); font-size: 26px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.kpi .v small { font-size: 15px; color: var(--ink-2); font-weight: 500; }
+.kpi .l { font-weight: 600; font-size: 14px; margin-top: 2px; }
+.kpi .s { color: var(--muted); font-size: 12px; }
+.kpi.destaca .v { color: var(--accent); }
+.fuente { color: var(--muted); font-size: 12.5px; margin: 0 0 8px; }
+
+section { padding-block: 28px 8px; scroll-margin-top: 70px; }
+.encabezado { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
+.encabezado h2 { font-size: 24px; font-weight: 700; }
+.encabezado p { margin: 0; color: var(--ink-2); max-width: 70ch; }
+.etiqueta { font-family: var(--f-mono); font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; min-width: 0; }
+.panel h3 { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+.panel .sub { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+.rejilla-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.rejilla-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+
+/* Simulador */
+.banco { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.plano-caja { position: relative; }
+#plano { width: 100%; height: auto; display: block; cursor: crosshair; touch-action: manipulation; }
+#plano .ap { cursor: pointer; }
+.leyenda { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-2); margin-top: 10px; }
+.leyenda span { display: inline-flex; align-items: center; gap: 6px; }
+.capas { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; font-size: 13px; color: var(--ink-2); }
+.seg { display: inline-flex; background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 3px; gap: 2px; }
+.seg button { border: 0; background: transparent; padding: 5px 12px; border-radius: 999px; font-weight: 600; font-size: 13px; color: var(--ink-2); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.controles { display: grid; gap: 14px; }
+.fila { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.btn { border: 1px solid var(--line); background: var(--surface); padding: 8px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 14px; }
+.btn:hover { border-color: var(--accent); }
+.btn.primario { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.rango { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; font-size: 14px; }
+.rango input { width: 100%; accent-color: var(--accent); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 4px 10px; font: 600 12.5px var(--f-mono); cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+.chip .pt { width: 8px; height: 8px; border-radius: 50%; background: var(--ap); }
+.chip[aria-pressed="false"] { color: var(--muted); text-decoration: line-through; background: var(--surface-2); }
+.chip[aria-pressed="false"] .pt { background: var(--ap-off); }
+
+.resultado { display: grid; grid-template-columns: 1fr auto; gap: 4px 14px; align-items: end; padding: 14px 16px; border-radius: var(--radius); background: var(--surface-2); border: 1px solid var(--line); }
+.resultado .zona { font-family: var(--f-display); font-size: 34px; font-weight: 800; line-height: 1; }
+.resultado .zona small { font-family: var(--f-body); font-size: 15px; font-weight: 600; color: var(--ink-2); margin-left: 6px; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-weight: 700; font-size: 13px; white-space: nowrap; }
+.pill.ok { background: var(--good-soft); color: var(--good); }
+.pill.mal { background: var(--crit-soft); color: var(--crit); }
+.pill.neutra { background: var(--accent-soft); color: var(--accent); }
+.datos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; grid-column: 1 / -1; margin-top: 10px; }
+.datos div { min-width: 0; }
+.datos b { display: block; font: 600 17px var(--f-mono); font-variant-numeric: tabular-nums; }
+.datos span { font-size: 12px; color: var(--muted); }
+
+.avisos { display: grid; gap: 6px; }
+.aviso { display: grid; grid-template-columns: auto 1fr; gap: 8px; padding: 8px 12px; border-radius: 8px; font-size: 13.5px; align-items: start; }
+.aviso.warn { background: var(--warn-soft); color: var(--warn); }
+.aviso.crit { background: var(--crit-soft); color: var(--crit); }
+.aviso.ok { background: var(--good-soft); color: var(--good); }
+.aviso .ic { font-weight: 800; font-family: var(--f-mono); }
+
+.tabla-ap { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tabla-ap th { text-align: left; font-weight: 600; color: var(--muted); font-size: 11.5px; letter-spacing: 0.05em; text-transform: uppercase; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+.tabla-ap td { padding: 5px 6px; border-bottom: 1px solid var(--grid); vertical-align: middle; }
+.tabla-ap td.num { text-align: right; white-space: nowrap; }
+.tabla-ap .barra-rssi { width: 100%; min-width: 90px; height: 16px; display: block; }
+.tabla-ap tr.apagado td { color: var(--muted); }
+.tabla-ap input[type=range] { width: 100%; accent-color: var(--accent); }
+
+.medidor { display: grid; gap: 8px; }
+.medidor .pista { position: relative; height: 12px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); overflow: hidden; }
+.medidor .relleno { position: absolute; inset: 0 auto 0 0; background: var(--accent); border-radius: 999px; transition: width .4s ease; }
+.medidor .marca-ref { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink); }
+.medidor .fila-m { display: flex; justify-content: space-between; font-size: 13px; color: var(--ink-2); gap: 10px; flex-wrap: wrap; }
+.medidor .fila-m b { font: 600 20px var(--f-mono); color: var(--ink); }
+
+/* Gráficos */
+svg.grafico { width: 100%; height: auto; display: block; overflow: visible; }
+svg text { font-family: var(--f-body); }
+.tick { fill: var(--muted); font-size: 11px; font-family: var(--f-mono); }
+.eje-lbl { fill: var(--ink-2); font-size: 12px; }
+.lbl { fill: var(--ink); font-size: 12.5px; font-weight: 600; }
+.lbl-2 { fill: var(--ink-2); font-size: 12px; }
+.val { fill: var(--ink-2); font-size: 11.5px; font-family: var(--f-mono); }
+.gl { stroke: var(--grid); stroke-width: 1; }
+.tag { font: 600 10.5px var(--f-mono); letter-spacing: .04em; text-transform: uppercase; padding: 2px 7px; border-radius: 4px; }
+.tag.curso { background: var(--accent-soft); color: var(--accent); }
+.tag.expl { background: var(--surface-2); color: var(--muted); border: 1px solid var(--line); }
+.tabla-mod { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.tabla-mod th { text-align: left; color: var(--muted); font-weight: 600; font-size: 11.5px; letter-spacing: .05em; text-transform: uppercase; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.tabla-mod td { padding: 7px 8px; border-bottom: 1px solid var(--grid); }
+.tabla-mod td.num { text-align: right; font-family: var(--f-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tabla-mod tr.final td { background: var(--accent-soft); }
+.punto-mod { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; vertical-align: -1px; }
+.desplaza { overflow-x: auto; }
+.nota { font-size: 13px; color: var(--ink-2); margin: 10px 0 0; max-width: 75ch; }
+.nota b { color: var(--ink); }
+.conmutador { margin-bottom: 10px; }
+
+#tip { position: fixed; z-index: 20; pointer-events: none; background: var(--ink); color: var(--bg); padding: 6px 9px; border-radius: 6px; font-size: 12.5px; max-width: 260px; opacity: 0; transition: opacity .1s; }
+#tip.ver { opacity: 1; }
+footer { color: var(--muted); font-size: 12.5px; padding-block: 28px 36px; border-top: 1px solid var(--line); margin-top: 28px; }
+footer a { color: var(--accent); }
+
+@media (max-width: 980px) {
+  .banco, .rejilla-2, .rejilla-3 { grid-template-columns: minmax(0, 1fr); }
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 520px) {
+  .kpis { grid-template-columns: minmax(0, 1fr); }
+  .datos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .nav { margin-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<header class="barra">
+  <div class="envoltura">
+    <div class="marca">
+      <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><circle cx="15" cy="15" r="3.5" style="fill:var(--accent)"/><circle cx="15" cy="15" r="8" style="fill:none;stroke:var(--accent);stroke-width:2;opacity:.6"/><circle cx="15" cy="15" r="13" style="fill:none;stroke:var(--accent);stroke-width:2;opacity:.3"/></svg>
+      <div><h1>Localizador WiFi QA-kNN</h1><small>Proyecto Integrador · Machine Learning I · Externado</small></div>
+    </div>
+    <nav class="nav" aria-label="Secciones">
+      <a href="#simulador">Simulador</a><a href="#modelos">Modelos</a><a href="#robustez">Características y robustez</a>
+    </nav>
+  </div>
+</header>
+
+<main class="envoltura">
+  <div class="kpis" id="kpis"></div>
+  <p class="fuente">Prueba en días nunca vistos (días 11–14, 1 440 visitas) del notebook de la entrega final. Datos de entrenamiento simulados y calibrados con mediciones reales.</p>
+
+  <section id="simulador" aria-labelledby="t-sim">
+    <div class="encabezado">
+      <span class="etiqueta">01 · En vivo</span>
+      <h2 id="t-sim">Simulador sobre el plano</h2>
+      <p>Haga clic en el plano para ubicar el dispositivo y en un punto de acceso para apagarlo. El modelo desplegado (kNN, k = 1) corre en esta página.</p>
+    </div>
+    <div class="banco">
+      <div class="panel">
+        <div class="capas">
+          <span>Capa del plano:</span>
+          <div class="seg" role="group" aria-label="Capa del plano">
+            <button id="capa-tipo" aria-pressed="true">Tipo de zona</button>
+            <button id="capa-acierto" aria-pressed="false">Acierto en prueba</button>
+          </div>
+        </div>
+        <div class="plano-caja"><svg id="plano" viewBox="-6 -6 312 212" role="img" aria-label="Plano del piso con 18 zonas y 8 puntos de acceso"></svg></div>
+        <div class="leyenda">
+          <span><svg width="14" height="12"><path d="M7 1 L13 11 L1 11 Z" style="fill:var(--ap)"/></svg>Punto de acceso (clic = apagar)</span>
+          <span><svg width="12" height="12"><circle cx="6" cy="6" r="5" style="fill:var(--real)"/></svg>Posición real</span>
+          <span><svg width="14" height="14"><path d="M2 2 L12 12 M12 2 L2 12" style="stroke:var(--accent);stroke-width:3"/></svg>Estimación (Método II)</span>
+          <span><svg width="16" height="12"><rect x="1" y="1" width="14" height="10" style="fill:none;stroke:var(--pred);stroke-width:2.5"/></svg>Zona estimada</span>
+        </div>
+      </div>
+
+      <div class="controles">
+        <div class="panel">
+          <div class="fila" style="justify-content:space-between">
+            <div class="seg" role="group" aria-label="Modo de entrada">
+              <button id="modo-sim" aria-pressed="true">Simular visita</button>
+              <button id="modo-man" aria-pressed="false">Lecturas a mano</button>
+            </div>
+            <div class="fila">
+              <button class="btn" id="btn-repetir" title="Nuevas lecturas en el mismo punto">Repetir aquí</button>
+              <button class="btn primario" id="btn-azar">Punto al azar</button>
+            </div>
+          </div>
+          <div class="rango" style="margin-top:14px" id="caja-m">
+            <label for="lecturas">Lecturas por AP</label>
+            <input type="range" id="lecturas" min="5" max="40" step="1" value="10">
+            <span class="num" id="lecturas-v">10</span>
+          </div>
+          <div style="margin-top:12px">
+            <div class="sub" style="margin-bottom:6px">Puntos de acceso encendidos</div>
+            <div class="chips" id="chips"></div>
+          </div>
+        </div>
+
+        <div class="resultado" id="resultado" aria-live="polite"></div>
+        <div class="avisos" id="avisos"></div>
+
+        <div class="panel medidor">
+          <h3>Precisión con esta configuración</h3>
+          <p class="sub" style="margin:0">300 visitas simuladas en zonas al azar con los APs y lecturas elegidos, más las fallas aleatorias del 3 % de los datos de prueba. La marca negra es el acierto con los 8 APs encendidos.</p>
+          <div class="pista"><div class="relleno" id="med-relleno" style="width:0%"></div><div class="marca-ref" id="med-ref"></div></div>
+          <div class="fila-m"><span>Acierto <b id="med-acc">…</b></span><span>Error medio <b id="med-err">…</b></span><span>Sin fallas <b id="med-base">…</b></span></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel" style="margin-top:16px">
+      <h3>Lecturas por punto de acceso</h3>
+      <p class="sub" id="sub-tabla">Cuartiles de las lecturas de esta visita (dBm). La caja es Q1–Q3 y la marca la mediana, sobre la escala del sensor (−95 a −30 dBm).</p>
+      <div class="desplaza"><table class="tabla-ap" id="tabla-ap"></table></div>
+    </div>
+  </section>
+
+  <section id="modelos" aria-labelledby="t-mod">
+    <div class="encabezado">
+      <span class="etiqueta">02 · Comparación</span>
+      <h2 id="t-mod">kNN frente a los demás modelos</h2>
+      <p>Modelos del curso contra la línea base; LDA y QDA son exploración. Mismo Pipeline y validación agrupada por día para todos.</p>
+    </div>
+    <div class="rejilla-2">
+      <div class="panel">
+        <h3>Acierto en días nuevos</h3>
+        <p class="sub">Rombo: prueba con intervalo bootstrap del 95 %. Círculo: media de la validación cruzada por días.</p>
+        <svg class="grafico" id="g-acc" viewBox="0 0 560 300" role="img" aria-label="Acierto por modelo"></svg>
+        <p class="nota" id="nota-acc"></p>
+      </div>
+      <div class="panel">
+        <h3>Cinco edificios simulados distintos</h3>
+        <p class="sub">El mismo entrenamiento y prueba en edificios con otra disposición de sombras. Pase el cursor sobre un punto para ver el edificio.</p>
+        <svg class="grafico" id="g-edif" viewBox="0 0 560 300" role="img" aria-label="Acierto por modelo en cinco edificios"></svg>
+        <p class="nota" id="nota-edif"></p>
+      </div>
+    </div>
+    <div class="panel" style="margin-top:16px">
+      <h3>Tabla de comparación</h3>
+      <p class="sub">Fuente: resultados_final.json (Entrega_Final_Notebook.ipynb, secciones 4 y 5).</p>
+      <div class="desplaza"><table class="tabla-mod" id="tabla-mod"></table></div>
+    </div>
+  </section>
+
+  <section id="robustez" aria-labelledby="t-rob">
+    <div class="encabezado">
+      <span class="etiqueta">03 · Análisis</span>
+      <h2 id="t-rob">Características y robustez</h2>
+      <p>Qué información usa el modelo y cuánto aguanta cuando el edificio no se comporta como en el entrenamiento.</p>
+    </div>
+    <div class="rejilla-2">
+      <div class="panel">
+        <h3>Importancia de cada punto de acceso</h3>
+        <p class="sub">Caída del acierto al desordenar los tres cuartiles de un AP (15 repeticiones, media ± DE).</p>
+        <svg class="grafico" id="g-imp" viewBox="0 0 560 300" role="img" aria-label="Importancia por punto de acceso"></svg>
+      </div>
+      <div class="panel">
+        <h3>¿Mediana o cuartiles?</h3>
+        <div class="seg conmutador" role="group" aria-label="Fuente de los datos">
+          <button data-fuente="Sim. calibrada" aria-pressed="true">Simulación calibrada</button>
+          <button data-fuente="Real (artículo)" aria-pressed="false">Datos reales del artículo</button>
+          <button data-fuente="Sim. paredes (E2)" aria-pressed="false">Escenario E2</button>
+        </div>
+        <svg class="grafico" id="g-rep" viewBox="0 0 560 270" role="img" aria-label="Acierto por representación y número de APs"></svg>
+        <p class="nota" id="nota-rep"></p>
+      </div>
+      <div class="panel">
+        <h3>Si se apaga un punto de acceso</h3>
+        <p class="sub">Acierto en prueba con ese AP sin señal (se imputa). Clic en una barra para apagarlo en el simulador.</p>
+        <svg class="grafico" id="g-caida" viewBox="0 0 560 260" role="img" aria-label="Acierto al apagar cada AP"></svg>
+      </div>
+      <div class="panel">
+        <h3>Lecturas por visita y escenario</h3>
+        <p class="sub">Izquierda: acierto según cuántas lecturas por AP se toman. Derecha: cada modelo con la simulación calibrada y con la de la Segunda entrega (2× la dispersión).</p>
+        <div class="rejilla-2" style="gap:10px">
+          <svg class="grafico" id="g-lect" viewBox="0 0 270 230" role="img" aria-label="Acierto según lecturas por AP"></svg>
+          <svg class="grafico" id="g-sens" viewBox="0 0 290 230" role="img" aria-label="Sensibilidad al escenario"></svg>
+        </div>
+      </div>
+    </div>
+    <div class="panel" style="margin-top:16px">
+      <h3>Calibración de la simulación</h3>
+      <p class="sub">Variación entre 40 lecturas repetidas en un mismo punto. La simulación final coincide con las mediciones reales; la de la Segunda entrega tenía el doble de dispersión.</p>
+      <div class="desplaza"><table class="tabla-mod" id="tabla-cal"></table></div>
+    </div>
+  </section>
+
+  <footer>
+    Sebastián Ramos · Daniel Cipagauta · Machine Learning I, Universidad Externado de Colombia. Reconstrucción de Ferreira, Souza y Carvalho (2020), <i>QA-kNN</i>, Sensors 20(17), 4714.
+    Código: <a href="https://github.com/danielo2858-spec/ml1-localizacion-qaknn" target="_blank" rel="noopener">github.com/danielo2858-spec/ml1-localizacion-qaknn</a>.
+    Uso de IA declarado: apoyo para código y redacción.
+  </footer>
+</main>
+<div id="tip" role="tooltip"></div>
+
+<script>
+const D = /*__DATOS__*/null;
+const G = D.geometria, E = D.edificio, M = D.modelo, R = D.resultados;
+const NAP = G.aps.length, NF = M.variables.length;
+const ZONAS = G.zonas, ZIDX = Object.fromEntries(ZONAS.map((z, i) => [z.id, i]));
+const CENTROS = ZONAS.map(z => [(z.x0 + z.x1) / 2, (z.y0 + z.y1) / 2]);
+const X = Float32Array.from(M.x_mil, v => v / 1000);
+const NTR = M.y.length;
+const fmt = (v, d = 1) => Number.isFinite(v) ? v.toFixed(d) : "—";
+const pct = (v, d = 1) => (v * 100).toFixed(d) + " %";
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+/* ---------------- simulador (puerto de qaknn/simulacion.py) ---------------- */
+function rngDe(semilla) {           // mulberry32
+  let a = semilla >>> 0;
+  const u = () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  let resto = null;
+  const normal = (m = 0, s = 1) => {
+    if (resto !== null) { const r = resto; resto = null; return m + s * r; }
+    let u1 = u(); while (u1 <= 1e-12) u1 = u();
+    const r = Math.sqrt(-2 * Math.log(u1)), th = 2 * Math.PI * u();
+    resto = r * Math.sin(th); return m + s * r * Math.cos(th);
+  };
+  return { u, normal, expo: m => -m * Math.log(1 - u()) };
+}
+function paredes(p, ap) {
+  const [x1, y1] = p, [x2, y2] = ap;
+  let muros = 0, tab = 0;
+  for (const yw of G.corredor) if ((y1 - yw) * (y2 - yw) < 0) muros++;
+  for (let xw = 5; xw < G.ancho; xw += 5) {
+    if ((x1 - xw) * (x2 - xw) < 0) {
+      const yc = y1 + (xw - x1) / (x2 - x1) * (y2 - y1);
+      if (!(G.corredor[0] < yc && yc < G.corredor[1])) tab++;
+    }
+  }
+  return [muros, tab];
+}
+function nivelMedio(p, a) {
+  const ap = G.aps[a];
+  const d = Math.max(Math.hypot(p[0] - ap[0], p[1] - ap[1]), 1);
+  const [mu, ta] = paredes(p, ap);
+  const ix = Math.round(p[0] / E.res), iy = Math.round(p[1] / E.res);
+  return E.p0[a] - 10 * E.n_pl * Math.log10(d) - mu * E.l_corredor - ta * E.l_tabique + E.campos[a][iy][ix];
+}
+function lecturasVisita(p, rng, m, apagados) {
+  const esc = E.escenario, A = [];
+  for (let j = 0; j < m; j++) A.push(new Array(NAP).fill(NaN));
+  for (let a = 0; a < NAP; a++) {
+    if (apagados.has(a)) continue;
+    const nivel = nivelMedio(p, a), deriva = rng.normal(0, E.sigma_dia);
+    const st = esc.sigma_base, pf = Math.min(esc.fade_base, 0.2);
+    let e = rng.normal(0, st);
+    for (let j = 0; j < m; j++) {
+      if (j > 0) e = E.phi * e + rng.normal(0, st * Math.sqrt(1 - E.phi * E.phi));
+      const fade = rng.u() < pf ? rng.expo(esc.fade_media) : 0;
+      const r = Math.round(nivel + deriva + e - fade);
+      const det = rng.u() < 1 / (1 + Math.exp(-(r - E.det_centro) / E.det_escala));
+      A[j][a] = (r < E.sensibilidad || !det) ? NaN : r;
+    }
+  }
+  return A;
+}
+function percentil(ordenado, q) {
+  const pos = (ordenado.length - 1) * q, lo = Math.floor(pos), hi = Math.ceil(pos);
+  return ordenado[lo] + (ordenado[hi] - ordenado[lo]) * (pos - lo);
+}
+function extraer(A) {            // misma regla que extraer_caracteristicas: Q1, Q2, Q3 por AP
+  const m = A.length, minDet = Math.max(2, Math.ceil(E.fraccion_min * m)), f = [];
+  for (let a = 0; a < NAP; a++) {
+    const v = A.map(fila => fila[a]).filter(Number.isFinite).sort((x, y) => x - y);
+    if (v.length >= minDet) f.push(percentil(v, .25), percentil(v, .5), percentil(v, .75));
+    else f.push(NaN, NaN, NaN);
+  }
+  return f;
+}
+/* ---------------- modelo desplegado: imputación → escalado → kNN (k = 1, Manhattan) ---------------- */
+function predecir(f, kVec = 5) {
+  const z = new Float32Array(NF);
+  for (let i = 0; i < NF; i++) z[i] = ((Number.isFinite(f[i]) ? f[i] : M.imputacion[i]) - M.media[i]) / M.escala[i];
+  const mejores = [];          // [distancia, índice], ordenado
+  for (let j = 0; j < NTR; j++) {
+    let d = 0; const o = j * NF;
+    for (let i = 0; i < NF; i++) d += Math.abs(z[i] - X[o + i]);
+    if (mejores.length < kVec || d < mejores[mejores.length - 1][0]) {
+      let k = mejores.length < kVec ? mejores.length : kVec - 1;
+      if (mejores.length < kVec) mejores.push(null);
+      while (k > 0 && mejores[k - 1][0] > d) { mejores[k] = mejores[k - 1]; k--; }
+      mejores[k] = [d, j];
+    }
+  }
+  const vecinos = mejores.map(([d, j]) => ({ zona: ZONAS[M.y[j]].id, d }));
+  const cx = vecinos.reduce((s, v) => s + CENTROS[ZIDX[v.zona]][0], 0) / vecinos.length;
+  const cy = vecinos.reduce((s, v) => s + CENTROS[ZIDX[v.zona]][1], 0) / vecinos.length;
+  return { zona: vecinos[0].zona, vecinos, centroide: [cx, cy] };
+}
+window.QA = { extraer, predecir };   // usado por la verificación automática contra el modelo de Python
+
+/* ---------------- estado ---------------- */
+const st = { modo: "sim", capa: "tipo", m: 10, apagados: new Set(), pos: [13.6, 15.4], semilla: 7, manual: null, f: null, pred: null };
+function zonaDe(p) { return ZONAS.find(z => p[0] >= z.x0 && p[0] < z.x1 && p[1] >= z.y0 && p[1] < z.y1) || ZONAS[ZONAS.length - 1]; }
+function correr(tabla = true) {
+  if (st.modo === "sim") {
+    const A = lecturasVisita(st.pos, rngDe(st.semilla), st.m, st.apagados);
+    st.f = extraer(A);
+  } else {
+    st.f = [];
+    for (let a = 0; a < NAP; a++) {
+      const q2 = st.manual[a];
+      if (st.apagados.has(a) || !Number.isFinite(q2)) st.f.push(NaN, NaN, NaN);
+      else st.f.push(q2 - 0.5, q2, q2 + 0.5);
+    }
+  }
+  st.pred = predecir(st.f);
+  dibujarPlano(); dibujarResultado(); dibujarAvisos();
+  if (tabla) dibujarTablaAP(); else actualizarCeldas();
+}
+function actualizarCeldas() {
+  for (let a = 0; a < NAP; a++) for (let q = 0; q < 3; q++) {
+    const c = document.getElementById(`c-${a}-${q}`); if (c) c.textContent = fmt(st.f[a * 3 + q]);
+  }
+}
+
+/* ---------------- plano ---------------- */
+const S = 10, H = 200;                       // 1 m = 10 unidades; y hacia arriba
+const sx = x => x * S, sy = y => H - y * S;
+const svgNS = "http://www.w3.org/2000/svg";
+function el(tag, attrs = {}, padre) {
+  const n = document.createElementNS(svgNS, tag);
+  for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+  if (padre) padre.appendChild(n);
+  return n;
+}
+function colorAcierto(v) {        // secuencial de un tono (0.85 → 1.0)
+  const t = Math.max(0, Math.min(1, (v - 0.85) / 0.15));
+  return `color-mix(in oklab, var(--pred) ${Math.round(15 + 70 * t)}%, var(--surface))`;
+}
+function dibujarPlano() {
+  const s = document.getElementById("plano"); s.replaceChildren();
+  const rec = R.interpretacion.recall_por_zona;
+  const fondo = { Aula: "var(--zona-aula)", Corredor: "var(--zona-corr)", Oficina: "var(--zona-ofic)" };
+  for (const z of ZONAS) {
+    const fill = st.capa === "acierto" ? colorAcierto(rec[z.id]) : fondo[z.tipo];
+    const r = el("rect", { x: sx(z.x0), y: sy(z.y1), width: (z.x1 - z.x0) * S, height: (z.y1 - z.y0) * S, style: `fill:${fill};stroke:var(--surface);stroke-width:1.5` }, s);
+    r.dataset.tip = `${z.id} · ${z.tipo} — acierto en prueba ${pct(rec[z.id], 0)}`;
+    const t = el("text", { x: sx(z.x0) + 3, y: sy(z.y0) - 4, style: "font:600 7px var(--f-mono);fill:var(--ink-2)" }, s);
+    t.textContent = st.capa === "acierto" ? `${z.id} ${Math.round(rec[z.id] * 100)}%` : z.id;
+  }
+  for (const yw of G.corredor) el("line", { x1: 0, x2: sx(G.ancho), y1: sy(yw), y2: sy(yw), style: "stroke:var(--muro);stroke-width:2.2" }, s);
+  for (let xw = 5; xw < G.ancho; xw += 5) {
+    el("line", { x1: sx(xw), x2: sx(xw), y1: sy(0), y2: sy(8), style: "stroke:var(--tabique);stroke-width:1" }, s);
+    el("line", { x1: sx(xw), x2: sx(xw), y1: sy(12), y2: sy(20), style: "stroke:var(--tabique);stroke-width:1" }, s);
+  }
+  el("rect", { x: 0, y: 0, width: sx(G.ancho), height: H, style: "fill:none;stroke:var(--ink);stroke-width:2.4" }, s);
+  // zona estimada
+  if (st.pred) {
+    const z = ZONAS[ZIDX[st.pred.zona]];
+    el("rect", { x: sx(z.x0) + 1.2, y: sy(z.y1) + 1.2, width: (z.x1 - z.x0) * S - 2.4, height: (z.y1 - z.y0) * S - 2.4, style: "fill:none;stroke:var(--pred);stroke-width:2.6" }, s);
+  }
+  // APs
+  G.aps.forEach(([x, y], a) => {
+    const g = el("g", { class: "ap", tabindex: 0, role: "button", "aria-label": `AP${a + 1} ${st.apagados.has(a) ? "apagado" : "encendido"}` }, s);
+    const off = st.apagados.has(a);
+    el("circle", { cx: sx(x), cy: sy(y), r: 9, style: "fill:transparent" }, g);
+    el("path", { d: `M${sx(x)} ${sy(y) - 5.5} L${sx(x) + 5} ${sy(y) + 3.5} L${sx(x) - 5} ${sy(y) + 3.5} Z`, style: `fill:${off ? "var(--ap-off)" : "var(--ap)"};stroke:var(--surface);stroke-width:1` }, g);
+    if (off) el("path", { d: `M${sx(x) - 6} ${sy(y) - 6} L${sx(x) + 6} ${sy(y) + 6}`, style: "stroke:var(--crit);stroke-width:1.6" }, g);
+    const t = el("text", { x: sx(x) + 6, y: sy(y) - 4, style: `font:700 7px var(--f-mono);fill:${off ? "var(--ap-off)" : "var(--ap)"}` }, g);
+    t.textContent = `AP${a + 1}`;
+    g.dataset.tip = `AP${a + 1} · ${off ? "apagado — clic para encender" : "clic para apagar"}`;
+    const alternar = ev => { ev.stopPropagation(); alternarAP(a); };
+    g.addEventListener("click", alternar);
+    g.addEventListener("keydown", ev => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); alternar(ev); } });
+  });
+  // posición real y estimación
+  if (st.modo === "sim") el("circle", { cx: sx(st.pos[0]), cy: sy(st.pos[1]), r: 4.2, style: "fill:var(--real);stroke:var(--surface);stroke-width:1.5" }, s);
+  if (st.pred) {
+    const [cx, cy] = st.pred.centroide;
+    el("path", { d: `M${sx(cx) - 4} ${sy(cy) - 4} L${sx(cx) + 4} ${sy(cy) + 4} M${sx(cx) + 4} ${sy(cy) - 4} L${sx(cx) - 4} ${sy(cy) + 4}`, style: "stroke:var(--accent);stroke-width:2.6;stroke-linecap:round" }, s);
+  }
+  // escala
+  el("line", { x1: sx(0), x2: sx(5), y1: H + 4, y2: H + 4, style: "stroke:var(--muted);stroke-width:1" }, s);
+  const e5 = el("text", { x: sx(5) + 3, y: H + 6.5, style: "font:500 6px var(--f-mono);fill:var(--muted)" }, s); e5.textContent = "5 m";
+}
+document.getElementById("plano").addEventListener("click", ev => {
+  const s = ev.currentTarget, pt = s.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY;
+  const p = pt.matrixTransform(s.getScreenCTM().inverse());
+  const x = p.x / S, y = (H - p.y) / S;
+  if (x < 0.3 || x > G.ancho - 0.3 || y < 0.3 || y > G.fondo - 0.3) return;
+  st.pos = [x, y]; st.semilla++;
+  if (st.modo !== "sim") ponerModo("sim"); else correr();
+});
+
+/* ---------------- resultado, avisos y tabla de APs ---------------- */
+function dibujarResultado() {
+  const p = st.pred, z = ZONAS[ZIDX[p.zona]];
+  const votos = p.vecinos.filter(v => v.zona === p.zona).length;
+  let pill = `<span class="pill neutra">Lecturas ingresadas a mano</span>`, err = "—";
+  if (st.modo === "sim") {
+    const real = zonaDe(st.pos);
+    const dReal = Math.hypot(p.centroide[0] - st.pos[0], p.centroide[1] - st.pos[1]);
+    err = `${fmt(dReal, 1)} m`;
+    pill = real.id === p.zona ? `<span class="pill ok">✓ Acierto: el dispositivo está en ${real.id}</span>`
+      : `<span class="pill mal">✗ Error: está en ${real.id} (${fmt(Math.hypot(CENTROS[ZIDX[real.id]][0] - CENTROS[ZIDX[p.zona]][0], CENTROS[ZIDX[real.id]][1] - CENTROS[ZIDX[p.zona]][1]), 1)} m)</span>`;
+  }
+  document.getElementById("resultado").innerHTML = `
+    <div><div class="sub" style="margin:0 0 4px">Zona estimada</div><div class="zona">${p.zona}<small>${z.tipo}</small></div></div>
+    <div>${pill}</div>
+    <div class="datos">
+      <div><b>${votos}/5</b><span>vecinos de la misma zona</span></div>
+      <div><b>${fmt(p.centroide[0])}, ${fmt(p.centroide[1])}</b><span>posición Método II (m)</span></div>
+      <div><b>${err}</b><span>${st.modo === "sim" ? "distancia a la posición real" : "sin posición real"}</span></div>
+    </div>`;
+}
+function dibujarAvisos() {
+  const f = st.f, av = [];
+  const faltan = [];
+  for (let a = 0; a < NAP; a++) if (!Number.isFinite(f[a * 3 + 1])) faltan.push(`AP${a + 1}`);
+  const caida = Object.values(R.robustez.caida_ap), lo = Math.min(...caida), hi = Math.max(...caida);
+  if (faltan.length === 1) av.push(["warn", "!", `${faltan[0]} sin señal suficiente: se imputa con la mediana del entrenamiento. Con un AP caído el acierto esperado es ${pct(lo, 0)}–${pct(hi, 0)}.`]);
+  if (faltan.length >= 2) av.push([faltan.length >= 3 ? "crit" : "warn", "!", `${faltan.join(", ")} sin señal suficiente: se imputan. Con varios APs caídos el acierto baja todavía más${faltan.length >= 3 ? "; la predicción es poco confiable" : ""}.`]);
+  const fuera = new Set();
+  M.variables.forEach((v, i) => { const [mn, mx] = M.rango[v]; if (Number.isFinite(f[i]) && (f[i] < mn - 3 || f[i] > mx + 3)) fuera.add(v.slice(0, 3)); });
+  if (fuera.size) av.push(["warn", "?", `Valores fuera del rango de entrenamiento en ${[...fuera].join(", ")}. ¿Las lecturas son de este edificio y están en dBm?`]);
+  const votos = st.pred.vecinos.filter(v => v.zona === st.pred.zona).length;
+  if (votos <= 2) av.push(["warn", "?", `Solo ${votos} de los 5 vecinos más parecidos son de ${st.pred.zona}: la visita está cerca de una frontera entre zonas.`]);
+  if (!av.length) av.push(["ok", "✓", "Lecturas dentro de lo que el modelo conoce: 8 APs con señal y valores en rango."]);
+  document.getElementById("avisos").innerHTML = av.map(([c, i, t]) => `<div class="aviso ${c}" role="${c === "ok" ? "status" : "alert"}"><span class="ic">${i}</span><span>${t}</span></div>`).join("");
+}
+function barraRSSI(q1, q2, q3) {
+  const a = -95, b = -30, x = v => (v - a) / (b - a) * 100;
+  if (!Number.isFinite(q2)) return `<svg class="barra-rssi" viewBox="0 0 100 16" preserveAspectRatio="none"><rect x="0" y="7" width="100" height="2" style="fill:var(--grid)"/></svg>`;
+  return `<svg class="barra-rssi" viewBox="0 0 100 16" preserveAspectRatio="none"><rect x="0" y="7" width="100" height="2" style="fill:var(--grid)"/>
+    <rect x="${x(q1)}" y="3" width="${Math.max(0.8, x(q3) - x(q1))}" height="10" rx="1" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:.6" vector-effect="non-scaling-stroke"/>
+    <rect x="${x(q2) - 0.5}" y="1" width="1.4" height="14" style="fill:var(--accent)"/></svg>`;
+}
+function dibujarTablaAP() {
+  const f = st.f, man = st.modo === "man";
+  document.getElementById("sub-tabla").textContent = man
+    ? "Mueva la mediana (Q2) de cada AP. Q1 y Q3 se fijan a ±0.5 dB, el rango intercuartílico típico medido en los datos reales."
+    : "Cuartiles de las lecturas de esta visita (dBm). La caja es Q1–Q3 y la marca la mediana, sobre la escala del sensor (−95 a −30 dBm).";
+  let h = `<thead><tr><th>AP</th><th>Estado</th><th style="text-align:right">Q1</th><th style="text-align:right">Q2</th><th style="text-align:right">Q3</th><th style="width:40%">${man ? "Mediana (dBm)" : "Rango −95 … −30 dBm"}</th></tr></thead><tbody>`;
+  for (let a = 0; a < NAP; a++) {
+    const [q1, q2, q3] = [f[a * 3], f[a * 3 + 1], f[a * 3 + 2]], off = st.apagados.has(a);
+    const estado = off ? "apagado" : (Number.isFinite(q2) ? "con señal" : "sin señal suficiente");
+    const ctrl = man ? `<input type="range" id="q2-${a}" min="-95" max="-30" step="0.5" value="${Number.isFinite(st.manual[a]) ? st.manual[a] : -80}" ${off ? "disabled" : ""} aria-label="Mediana del AP${a + 1}">` : barraRSSI(q1, q2, q3);
+    h += `<tr class="${Number.isFinite(q2) ? "" : "apagado"}"><td class="mono"><b>AP${a + 1}</b></td><td>${estado}</td><td class="num mono" id="c-${a}-0">${fmt(q1)}</td><td class="num mono" id="c-${a}-1">${fmt(q2)}</td><td class="num mono" id="c-${a}-2">${fmt(q3)}</td><td>${ctrl}</td></tr>`;
+  }
+  const t = document.getElementById("tabla-ap"); t.innerHTML = h + "</tbody>";
+  if (man) for (let a = 0; a < NAP; a++) {
+    const inp = document.getElementById(`q2-${a}`);
+    inp.addEventListener("input", () => { st.manual[a] = parseFloat(inp.value); correr(false); });
+  }
+}
+
+/* ---------------- controles ---------------- */
+function dibujarChips() {
+  document.getElementById("chips").innerHTML = G.aps.map((_, a) =>
+    `<button class="chip" data-ap="${a}" aria-pressed="${!st.apagados.has(a)}"><span class="pt"></span>AP${a + 1}</button>`).join("");
+  document.querySelectorAll(".chip").forEach(b => b.addEventListener("click", () => alternarAP(+b.dataset.ap)));
+}
+function alternarAP(a) {
+  st.apagados.has(a) ? st.apagados.delete(a) : st.apagados.add(a);
+  dibujarChips(); correr(); gCaida(); medirPronto();
+}
+function ponerModo(m) {
+  st.modo = m;
+  document.getElementById("modo-sim").setAttribute("aria-pressed", m === "sim");
+  document.getElementById("modo-man").setAttribute("aria-pressed", m === "man");
+  document.getElementById("caja-m").hidden = m === "man";
+  if (m === "man") st.manual = Array.from({ length: NAP }, (_, a) => Number.isFinite(st.f[a * 3 + 1]) ? Math.round(st.f[a * 3 + 1] * 2) / 2 : -80);
+  correr();
+}
+document.getElementById("modo-sim").addEventListener("click", () => ponerModo("sim"));
+document.getElementById("modo-man").addEventListener("click", () => ponerModo("man"));
+document.getElementById("btn-repetir").addEventListener("click", () => { st.semilla++; if (st.modo !== "sim") ponerModo("sim"); else correr(); });
+document.getElementById("btn-azar").addEventListener("click", () => {
+  const r = rngDe(Date.now() & 0xffffffff), z = ZONAS[Math.floor(r.u() * ZONAS.length)];
+  st.pos = [z.x0 + 0.3 + r.u() * (z.x1 - z.x0 - 0.6), z.y0 + 0.3 + r.u() * (z.y1 - z.y0 - 0.6)]; st.semilla++;
+  if (st.modo !== "sim") ponerModo("sim"); else correr();
+});
+const inpM = document.getElementById("lecturas");
+inpM.addEventListener("input", () => { st.m = +inpM.value; document.getElementById("lecturas-v").textContent = st.m; correr(); medirPronto(); });
+for (const [id, capa] of [["capa-tipo", "tipo"], ["capa-acierto", "acierto"]])
+  document.getElementById(id).addEventListener("click", () => {
+    st.capa = capa;
+    document.getElementById("capa-tipo").setAttribute("aria-pressed", capa === "tipo");
+    document.getElementById("capa-acierto").setAttribute("aria-pressed", capa === "acierto");
+    dibujarPlano();
+  });
+
+/* ---------------- medición de precisión en vivo (Monte Carlo) ---------------- */
+function medir(n, m, apagados, semilla = 777) {
+  const r = rngDe(semilla); let ok = 0, err = 0;
+  for (let i = 0; i < n; i++) {
+    const z = ZONAS[Math.floor(r.u() * ZONAS.length)];
+    const p = [z.x0 + 0.3 + r.u() * (z.x1 - z.x0 - 0.6), z.y0 + 0.3 + r.u() * (z.y1 - z.y0 - 0.6)];
+    const caidos = new Set(apagados);
+    for (let a = 0; a < NAP; a++) if (r.u() < E.p_falla) caidos.add(a);     // fallas aleatorias, como en los datos
+    const pr = predecir(extraer(lecturasVisita(p, r, m, caidos)), 1).zona;
+    if (pr === z.id) ok++; else err += Math.hypot(CENTROS[ZIDX[pr]][0] - CENTROS[ZIDX[z.id]][0], CENTROS[ZIDX[pr]][1] - CENTROS[ZIDX[z.id]][1]);
+  }
+  return { acc: ok / n, err: err / n };
+}
+let base = null, temporizador = null;
+function medirPronto() {
+  clearTimeout(temporizador);
+  document.getElementById("med-acc").textContent = "…";
+  temporizador = setTimeout(() => {
+    if (!base) base = medir(300, st.m, new Set());
+    const r = medir(300, st.m, st.apagados);
+    document.getElementById("med-relleno").style.width = `${(r.acc * 100).toFixed(1)}%`;
+    document.getElementById("med-ref").style.left = `${(base.acc * 100).toFixed(1)}%`;
+    document.getElementById("med-acc").textContent = pct(r.acc);
+    document.getElementById("med-err").textContent = `${fmt(r.err, 2)} m`;
+    document.getElementById("med-base").textContent = pct(base.acc);
+  }, 60);
+}
+
+/* ---------------- gráficos ---------------- */
+const MODELOS = ["kNN", "QDA", "Logística Ridge (L2)", "Logística Lasso (L1)", "Naive Bayes", "LDA"];
+const COLOR = { "kNN": "var(--m-knn)", "Naive Bayes": "var(--m-nb)", "Logística Ridge (L2)": "var(--m-ridge)", "Logística Lasso (L1)": "var(--m-lasso)", "LDA": "var(--m-lda)", "QDA": "var(--m-qda)", "Línea base": "var(--m-base)" };
+const COMP = Object.fromEntries(R.comparacion.map(c => [c.Modelo, c]));
+const tip = document.getElementById("tip");
+document.addEventListener("mousemove", ev => {
+  const t = ev.target.closest && ev.target.closest("[data-tip]");
+  if (!t) { tip.classList.remove("ver"); return; }
+  tip.textContent = t.dataset.tip; tip.classList.add("ver");
+  const x = Math.min(ev.clientX + 14, innerWidth - tip.offsetWidth - 8), y = ev.clientY + 16;
+  tip.style.left = x + "px"; tip.style.top = y + "px";
+});
+function escala(d0, d1, r0, r1) { const f = v => r0 + (v - d0) / (d1 - d0) * (r1 - r0); f.inv = p => d0 + (p - r0) / (r1 - r0) * (d1 - d0); return f; }
+function ejeX(s, x, y0, y1, ticks, formato) {
+  for (const t of ticks) {
+    el("line", { x1: x(t), x2: x(t), y1: y0, y2: y1, class: "gl" }, s);
+    const tx = el("text", { x: x(t), y: y1 + 14, "text-anchor": "middle", class: "tick" }, s); tx.textContent = formato(t);
+  }
+}
+function texto(s, x, y, t, cls, extra = {}) { const n = el("text", { x, y, class: cls, ...extra }, s); n.textContent = t; return n; }
+
+function gAcierto() {
+  const s = document.getElementById("g-acc"); s.replaceChildren();
+  const x = escala(0.86, 0.99, 170, 520), filas = MODELOS, y0 = 18, paso = 42;
+  ejeX(s, x, 6, y0 + paso * filas.length - 10, [0.88, 0.90, 0.92, 0.94, 0.96, 0.98], t => pct(t, 0));
+  filas.forEach((n, i) => {
+    const c = COMP[n], y = y0 + i * paso, col = COLOR[n];
+    texto(s, 0, y + 4, n, "lbl");
+    texto(s, 0, y + 18, c.grupo === "curso" ? "del curso" : "exploración", "lbl-2");
+    el("line", { x1: x(c.acc_ic[0]), x2: x(c.acc_ic[1]), y1: y + 6, y2: y + 6, style: `stroke:${col};stroke-width:2` }, s);
+    for (const v of c.acc_ic) el("line", { x1: x(v), x2: x(v), y1: y + 2, y2: y + 10, style: `stroke:${col};stroke-width:2` }, s);
+    const r = el("path", { d: `M${x(c.acc_te)} ${y} l6 6 l-6 6 l-6 -6 Z`, style: `fill:var(--surface);stroke:${col};stroke-width:2.2` }, s);
+    r.dataset.tip = `${n}: prueba ${pct(c.acc_te)} [${pct(c.acc_ic[0])}–${pct(c.acc_ic[1])}] · CV ${pct(c.acc)} ± ${pct(c.acc_sd)}`;
+    const cv = el("circle", { cx: x(c.acc), cy: y - 6, r: 4, style: `fill:${col}` }, s);
+    cv.dataset.tip = `${n}: validación cruzada ${pct(c.acc)} ± ${pct(c.acc_sd)}`;
+    texto(s, 560, y + 10, pct(c.acc_te), "val", { "text-anchor": "end" });
+  });
+  const b = COMP["Línea base"];
+  texto(s, 170, y0 + paso * filas.length + 18, `Línea base (clase mayoritaria): ${pct(b.acc_te)} — fuera de escala`, "lbl-2");
+  const mc = R.mcnemar["kNN vs Logística Ridge (L2)"];
+  document.getElementById("nota-acc").innerHTML = `<b>kNN ${pct(COMP.kNN.acc_te)}</b> frente a <b>${pct(COMP["Logística Ridge (L2)"].acc_te)}</b> de la mejor alternativa del curso, sin solapamiento de intervalos. Donde discrepan, kNN acierta ${mc[0]} casos y la logística ${mc[1]} (McNemar, p &lt; 10⁻¹⁰).`;
+}
+function gEdificios() {
+  const s = document.getElementById("g-edif"); s.replaceChildren();
+  const ed = R.estabilidad, semillas = ["42", "7", "123", "2024", "31415"];
+  const x = escala(0.85, 0.99, 170, 520), y0 = 18, paso = 42;
+  ejeX(s, x, 6, y0 + paso * MODELOS.length - 10, [0.86, 0.88, 0.90, 0.92, 0.94, 0.96, 0.98], t => pct(t, 0));
+  MODELOS.forEach((n, i) => {
+    const k = ed.Modelo.indexOf(n), y = y0 + i * paso, col = COLOR[n];
+    const vals = semillas.map(sm => ed[sm][k]);
+    texto(s, 0, y + 4, n, "lbl");
+    texto(s, 0, y + 18, `media ${pct(ed.media[k])} · 1.º en ${ed["veces 1.º"][k]} de 5`, "lbl-2");
+    el("line", { x1: x(Math.min(...vals)), x2: x(Math.max(...vals)), y1: y, y2: y, style: `stroke:${col};stroke-width:2;opacity:.5` }, s);
+    vals.forEach((v, j) => { const c = el("circle", { cx: x(v), cy: y, r: 5, style: `fill:${col};stroke:var(--surface);stroke-width:1.5` }, s); c.dataset.tip = `${n} · edificio ${j + 1} (semilla ${semillas[j]}): ${pct(v)}`; });
+  });
+  document.getElementById("nota-edif").innerHTML = `kNN queda <b>primero en los 5 edificios</b> (${pct(ed.media[ed.Modelo.indexOf("kNN")])} ± ${pct(ed.DE[ed.Modelo.indexOf("kNN")])}). El resultado no depende de un edificio particular.`;
+}
+function tablaModelos() {
+  const ed = R.estabilidad, hip = { "kNN": "k = 1 · Manhattan", "Naive Bayes": "var_smoothing = 10⁻³", "Logística Ridge (L2)": "C = 10", "Logística Lasso (L1)": "C = 3", "LDA": "shrinkage automático", "QDA": "reg_param = 0.05", "Línea base": "clase mayoritaria" };
+  const filas = [...MODELOS, "Línea base"].map(n => {
+    const c = COMP[n], k = ed.Modelo.indexOf(n);
+    const grupo = n === "Línea base" ? "" : `<span class="tag ${c.grupo === "curso" ? "curso" : "expl"}">${c.grupo === "curso" ? "curso" : "exploración"}</span>`;
+    return `<tr class="${n === "kNN" ? "final" : ""}"><td><span class="punto-mod" style="background:${COLOR[n]}"></span><b>${n}</b>${n === "kNN" ? " · modelo final" : ""}</td><td>${grupo}</td><td>${hip[n]}</td>
+      <td class="num">${pct(c.acc)} ± ${pct(c.acc_sd)}</td><td class="num">${pct(c.acc_te)}</td><td class="num">${pct(c.acc_ic[0])}–${pct(c.acc_ic[1])}</td>
+      <td class="num">${fmt(c.me_te, 2)} m</td><td class="num">${k >= 0 ? pct(ed.media[k]) : "—"}</td></tr>`;
+  }).join("");
+  document.getElementById("tabla-mod").innerHTML = `<thead><tr><th>Modelo</th><th>Grupo</th><th>Hiperparámetros</th><th style="text-align:right">Acierto CV</th><th style="text-align:right">Acierto prueba</th><th style="text-align:right">IC 95 %</th><th style="text-align:right">Error medio</th><th style="text-align:right">5 edificios</th></tr></thead><tbody>${filas}</tbody>`;
+}
+function gImportancia() {
+  const s = document.getElementById("g-imp"); s.replaceChildren();
+  const imp = R.interpretacion.importancia_AP, ords = Object.keys(imp).sort((a, b) => imp[b][0] - imp[a][0]);
+  const x = escala(0, 0.15, 50, 470), paso = 27;
+  ejeX(s, x, 4, 8 + paso * ords.length, [0, 0.03, 0.06, 0.09, 0.12, 0.15], t => (t * 100).toFixed(0) + " pp");
+  ords.forEach((a, i) => {
+    const [m, sd] = imp[a], y = 10 + i * paso;
+    texto(s, 0, y + 12, a, "lbl", { style: "font-family:var(--f-mono)" });
+    const r = el("rect", { x: x(0), y, width: x(m) - x(0), height: 17, rx: 3, style: "fill:var(--m-knn)" }, s);
+    r.dataset.tip = `${a}: el acierto cae ${(m * 100).toFixed(1)} puntos (DE ${(sd * 100).toFixed(1)})`;
+    el("line", { x1: x(m - sd), x2: x(m + sd), y1: y + 8.5, y2: y + 8.5, style: "stroke:var(--ink);stroke-width:1.2" }, s);
+    texto(s, x(m + sd) + 6, y + 13, `−${(m * 100).toFixed(1)} pp`, "val");
+  });
+  const q = R.interpretacion.importancia_cuartil, yq = 8 + paso * ords.length + 40;
+  texto(s, 0, yq + 6, "Por tipo de cuartil:", "lbl-2");
+  ["Q1", "Q2", "Q3"].forEach((k, i) => { texto(s, 130 + i * 120, yq + 6, `${k} −${(q[k][0] * 100).toFixed(1)} pp`, "val"); });
+  texto(s, 0, yq + 24, "Los tres pesan lo mismo: el modelo usa el nivel de señal, no la forma de la distribución.", "lbl-2");
+}
+let fuenteRep = "Sim. calibrada";
+function gRepresentacion() {
+  const s = document.getElementById("g-rep"); s.replaceChildren();
+  const filas = R.representaciones.filter(r => r[0] === fuenteRep);
+  const reps = [["Lectura cruda", "var(--r-cruda)", "4 3"], ["Media", "var(--r-media)", "6 3"], ["Mediana (Q2)", "var(--r-mediana)", "2 2"], ["Cuartiles Q1–Q3", "var(--r-cuart)", ""]];
+  const ns = [2, 3, 4, 8], x = escala(2, 8, 50, 400), y = escala(0.3, 1.0, 230, 14);
+  for (const t of [0.4, 0.6, 0.8, 1.0]) { el("line", { x1: 50, x2: 400, y1: y(t), y2: y(t), class: "gl" }, s); texto(s, 44, y(t) + 4, pct(t, 0), "tick", { "text-anchor": "end" }); }
+  for (const n of ns) texto(s, x(n), 248, `${n}`, "tick", { "text-anchor": "middle" });
+  texto(s, 225, 266, "número de APs usados", "eje-lbl", { "text-anchor": "middle" });
+  reps.forEach(([rep, col, dash], i) => {
+    const pts = ns.map(n => { const f = filas.find(r => r[1] === n && r[2] === rep); return [x(n), y(f[3]), f[3], n]; });
+    el("polyline", { points: pts.map(p => p.slice(0, 2).join(",")).join(" "), style: `fill:none;stroke:${col};stroke-width:${rep.startsWith("Cuart") ? 2.6 : 2};stroke-dasharray:${dash}` }, s);
+    pts.forEach(([px, py, v, n]) => { const c = el("circle", { cx: px, cy: py, r: 3.6, style: `fill:${col};stroke:var(--surface);stroke-width:1.2` }, s); c.dataset.tip = `${rep} · ${n} APs: ${pct(v)}`; });
+    el("line", { x1: 418, x2: 438, y1: 30 + i * 22, y2: 30 + i * 22, style: `stroke:${col};stroke-width:2.4;stroke-dasharray:${dash}` }, s);
+    texto(s, 444, 34 + i * 22, rep, "lbl-2");
+  });
+  const d = R.dif_cuartiles_media[fuenteRep]["2"];
+  const txt = {
+    "Sim. calibrada": `Resumir lecturas sí ayuda frente a una lectura cruda, pero <b>la mediana sola rinde igual que los tres cuartiles</b> (diferencia cuartiles − media con 2 APs: ${(d[0] * 100).toFixed(1)} ± ${(d[1] * 100).toFixed(1)} pp). Basta 1 valor por AP: 8 variables en lugar de 24.`,
+    "Real (artículo)": `En las mediciones reales de los autores pasa lo mismo: cuartiles y media empatan (${(d[0] * 100).toFixed(1)} ± ${(d[1] * 100).toFixed(1)} pp con 2 APs) y con 4 APs todas las representaciones resumidas llegan al 100 %.`,
+    "Sim. paredes (E2)": `Solo con la dispersión inflada de la Segunda entrega los cuartiles superan a la media con 2 APs (+${(d[0] * 100).toFixed(1)} pp). Por eso esa ventaja se trató como un artefacto del escenario.`,
+  };
+  document.getElementById("nota-rep").innerHTML = txt[fuenteRep];
+}
+document.querySelectorAll("[data-fuente]").forEach(b => b.addEventListener("click", () => {
+  fuenteRep = b.dataset.fuente;
+  document.querySelectorAll("[data-fuente]").forEach(o => o.setAttribute("aria-pressed", o === b));
+  gRepresentacion();
+}));
+function gCaida() {
+  const s = document.getElementById("g-caida"); s.replaceChildren();
+  const c = R.robustez.caida_ap, aps = Object.keys(c), ref = COMP.kNN.acc_te;
+  const x0 = 50, ancho = 470, paso = ancho / aps.length, y = escala(0.8, 1.0, 210, 14);
+  for (const t of [0.8, 0.85, 0.9, 0.95, 1.0]) { el("line", { x1: x0, x2: x0 + ancho, y1: y(t), y2: y(t), class: "gl" }, s); texto(s, x0 - 6, y(t) + 4, pct(t, 0), "tick", { "text-anchor": "end" }); }
+  aps.forEach((a, i) => {
+    const v = c[a], bx = x0 + i * paso + paso * 0.18, w = paso * 0.64;
+    const r = el("rect", { x: bx, y: y(v), width: w, height: y(0.8) - y(v), rx: 3, style: `fill:${st.apagados.has(i) ? "var(--crit)" : "var(--m-knn)"};cursor:pointer` }, s);
+    r.dataset.tip = `${a} apagado: ${pct(v)} de acierto (−${((ref - v) * 100).toFixed(1)} pp). Clic: probarlo en el simulador.`;
+    r.addEventListener("click", () => { if (!st.apagados.has(i)) alternarAP(i); location.hash = "simulador"; });
+    texto(s, bx + w / 2, y(v) - 5, pct(v, 0), "val", { "text-anchor": "middle" });
+    texto(s, bx + w / 2, 228, a, "tick", { "text-anchor": "middle" });
+  });
+  el("line", { x1: x0, x2: x0 + ancho, y1: y(ref), y2: y(ref), style: "stroke:var(--ink);stroke-width:1.4;stroke-dasharray:5 4" }, s);
+  texto(s, x0 + ancho, y(ref) - 6, `con los 8 APs: ${pct(ref)}`, "lbl-2", { "text-anchor": "end" });
+}
+function gLecturas() {
+  const s = document.getElementById("g-lect"); s.replaceChildren();
+  const L = R.robustez.lecturas, ms = Object.keys(L).map(Number);
+  const x = escala(0, 40, 46, 255), y = escala(0.9, 1.0, 190, 16);
+  for (const t of [0.9, 0.95, 1.0]) { el("line", { x1: 46, x2: 255, y1: y(t), y2: y(t), class: "gl" }, s); texto(s, 40, y(t) + 4, pct(t, 0), "tick", { "text-anchor": "end" }); }
+  for (const m of ms) texto(s, x(m), 206, `${m}`, "tick", { "text-anchor": "middle" });
+  texto(s, 150, 224, "lecturas por AP", "eje-lbl", { "text-anchor": "middle" });
+  el("polyline", { points: ms.map(m => `${x(m)},${y(L[m])}`).join(" "), style: "fill:none;stroke:var(--m-knn);stroke-width:2.4" }, s);
+  ms.forEach((m, i) => { const c = el("circle", { cx: x(m), cy: y(L[m]), r: 4.5, style: "fill:var(--m-knn);stroke:var(--surface);stroke-width:1.5" }, s); c.dataset.tip = `${m} lecturas por AP: ${pct(L[m])}`; if (i === 0 || i === ms.length - 1) texto(s, x(m), y(L[m]) - 9, pct(L[m]), "val", { "text-anchor": "middle" }); });
+}
+function gSensibilidad() {
+  const s = document.getElementById("g-sens"); s.replaceChildren();
+  const S2 = R.robustez.sensibilidad, ords = Object.keys(S2).sort((a, b) => S2[b].calibrado - S2[a].calibrado);
+  const x = escala(0.88, 0.98, 120, 285), paso = 26;
+  ejeX(s, x, 6, 12 + paso * ords.length, [0.88, 0.93, 0.98], t => pct(t, 0));
+  ords.forEach((n, i) => {
+    const y = 20 + i * paso, v = S2[n];
+    texto(s, 0, y + 4, n.replace("Logística ", "Log. "), "lbl-2");
+    el("line", { x1: x(v.calibrado), x2: x(v.paredes), y1: y, y2: y, style: "stroke:var(--line);stroke-width:3" }, s);
+    const a = el("circle", { cx: x(v.calibrado), cy: y, r: 5, style: `fill:${COLOR[n]}` }, s); a.dataset.tip = `${n} · calibrada: ${pct(v.calibrado)}`;
+    const b = el("path", { d: `M${x(v.paredes)} ${y - 5} l5 5 l-5 5 l-5 -5 Z`, style: `fill:var(--surface);stroke:${COLOR[n]};stroke-width:1.8` }, s); b.dataset.tip = `${n} · escenario E2: ${pct(v.paredes)}`;
+  });
+  texto(s, 120, 12 + paso * ords.length + 30, "● calibrada   ◇ escenario E2", "lbl-2");
+}
+function tablaCal() {
+  const c = R.calibracion, fuentes = ["Real (artículo)", "Piloto propio", "Sim. calibrada", "Sim. paredes (E2)"];
+  const filas = Object.keys(c["Real (artículo)"]);
+  document.getElementById("tabla-cal").innerHTML = `<thead><tr><th>Estadístico</th>${fuentes.map(f => `<th style="text-align:right">${f === "Sim. calibrada" ? "Simulación final" : f === "Sim. paredes (E2)" ? "Simulación E2" : f}</th>`).join("")}</tr></thead><tbody>` +
+    filas.map(fl => `<tr><td>${fl}</td>${fuentes.map(f => `<td class="num" ${f === "Sim. calibrada" ? 'style="font-weight:600"' : ""}>${c[f][fl]}</td>`).join("")}</tr>`).join("") + "</tbody>";
+}
+function kpis() {
+  const k = COMP.kNN, caida = Object.values(R.robustez.caida_ap), ed = R.estabilidad;
+  const items = [
+    ["destaca", pct(k.acc_te), "acierto de zona", `IC 95 % ${pct(k.acc_ic[0])}–${pct(k.acc_ic[1])} · kNN, k = 1`],
+    ["", `${fmt(k.me_te, 2)} <small>m</small>`, "error medio de localización", `línea base: ${fmt(COMP["Línea base"].me_te, 1)} m`],
+    ["", `${ed["veces 1.º"][ed.Modelo.indexOf("kNN")]} <small>/ 5</small>`, "edificios donde kNN gana", "frente a 5 modelos alternativos"],
+    ["", `${Math.round(Math.min(...caida) * 100)}–${Math.round(Math.max(...caida) * 100)} <small>%</small>`, "con un AP apagado", "imputación por mediana"],
+    ["", pct(R.robustez.lecturas["5"], 0), "con solo 5 lecturas por AP", "frente a 40 del artículo"],
+  ];
+  document.getElementById("kpis").innerHTML = items.map(([c, v, l, s]) => `<div class="kpi ${c}"><div class="v">${v}</div><div class="l">${l}</div><div class="s">${s}</div></div>`).join("");
+}
+
+/* ---------------- arranque ---------------- */
+kpis(); dibujarChips(); correr(); gAcierto(); gEdificios(); tablaModelos(); gImportancia(); gRepresentacion(); gCaida(); gLecturas(); gSensibilidad(); tablaCal();
+medirPronto();
+</script>
