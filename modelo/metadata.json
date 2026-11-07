@@ -5311,7 +5311,7 @@
  "entrenado_con": "14 días × 18 zonas × 20 visitas (5 040 instancias)",
  "metricas_prueba": {
   "accuracy": 0.9688,
-  "error_medio_m": 0.185
+  "error_medio_m": 0.1854
  },
  "version_sklearn": "1.9.1"
 }

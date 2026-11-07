@@ -168,7 +168,7 @@ with tab_sim:
     zona_sel = a.selectbox("Zona donde está el dispositivo", [z[0] for z in ZONAS], index=6,
                            format_func=lambda z: f"{z} · {TIPO[z]}")
     m_sel = b.slider("Lecturas por AP", MIN_LECTURAS, 40, 10, help="Con 5 lecturas el acierto se mantiene cerca del 97 %.")
-    caidos = c.multiselect("Simular APs apagados", [f"AP{i}" for i in range(1, N_APS + 1)])
+    caidos = c.multiselect("Simular APs apagados", [f"AP{i}" for i in range(1, N_APS + 1)], placeholder="Ninguno")
     if "semilla" not in st.session_state:
         st.session_state.semilla = 0
     if st.button("Nueva visita", type="primary"):
