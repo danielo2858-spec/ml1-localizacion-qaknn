@@ -8,10 +8,13 @@ Reconstrucción del artículo *QA-kNN: Indoor Localization Based on Quartile Ana
 simulado de un edificio universitario colombiano: predecir la zona (18 clases) en la que está un dispositivo a partir de los
 cuartiles Q1, Q2 y Q3 del RSSI de 8 puntos de acceso.
 
-## Entrega final (en construcción)
+## Entrega final
 
 | Ruta | Contenido |
 |---|---|
+| `Entrega_Final_Informe.docx` | Informe de la entrega final (Fase 3: consolidación, despliegue y comunicación) |
+| `Entrega_Final_Presentacion.pptx` | Presentación de la sustentación, con notas del orador y guía de la demostración |
+| `dashboard/index.html` | Panel interactivo autocontenido: el modelo desplegado corre en el navegador (abrir el archivo en cualquier navegador). Se regenera con `python dashboard/construir_dashboard.py` |
 | `Entrega_Final_Notebook.ipynb` | **Código de la entrega final**: simulación recalibrada, comparación y estabilidad en 5 edificios, selección del modelo final, objetivos del artículo (incl. Método II), interpretación, robustez y modelo desplegado |
 | `app.py` | **Despliegue**: aplicación Streamlit que recibe lecturas RSSI y devuelve la zona estimada |
 | `qaknn/` | Simulador y extracción de cuartiles, compartidos por el notebook y la app |
