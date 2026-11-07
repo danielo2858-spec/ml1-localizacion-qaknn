@@ -8,7 +8,30 @@ Reconstrucción del artículo *QA-kNN: Indoor Localization Based on Quartile Ana
 simulado de un edificio universitario colombiano: predecir la zona (18 clases) en la que está un dispositivo a partir de los
 cuartiles Q1, Q2 y Q3 del RSSI de 8 puntos de acceso.
 
-## Estructura
+## Entrega final (en construcción)
+
+| Ruta | Contenido |
+|---|---|
+| `Entrega_Final_Notebook.ipynb` | **Código de la entrega final**: simulación recalibrada, comparación y estabilidad en 5 edificios, selección del modelo final, objetivos del artículo (incl. Método II), interpretación, robustez y modelo desplegado |
+| `app.py` | **Despliegue**: aplicación Streamlit que recibe lecturas RSSI y devuelve la zona estimada |
+| `qaknn/` | Simulador y extracción de cuartiles, compartidos por el notebook y la app |
+| `modelo/` | Pipeline final (`modelo_final.joblib`) y sus metadatos |
+| `figuras_final/`, `resultados_final.json` | Figuras y cifras de la entrega final |
+| `datos/dataset_final_calibrado.csv` | Dataset final (simulación calibrada) |
+
+### Ejecutar la aplicación
+
+```bash
+pip install -r requirements.txt
+streamlit run app.py
+```
+
+Se abre en el navegador (`http://localhost:8501`). Tiene tres formas de entrada: simular una visita en una zona,
+cargar un CSV de lecturas (columnas `AP1` … `AP8`, una fila por lectura, en dBm) o escribir los cuartiles a mano.
+El modelo se guardó con scikit-learn 1.9.1; para cargarlo hay que usar esa misma versión.
+Para regenerar el modelo: `jupyter nbconvert --to notebook --execute --inplace Entrega_Final_Notebook.ipynb` (~3 min).
+
+## Segunda entrega
 
 | Ruta | Contenido |
 |---|---|
