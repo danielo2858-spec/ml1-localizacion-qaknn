@@ -12,10 +12,11 @@ cuartiles Q1, Q2 y Q3 del RSSI de 8 puntos de acceso.
 
 | Ruta | Contenido |
 |---|---|
-| `Entrega_Final_Informe.docx` | Informe de la entrega final (Fase 3: consolidación, despliegue y comunicación) |
+| `Entrega_Final_Informe.docx` | Informe de la entrega final (Fase 3: consolidación, interpretación y comunicación) |
 | `Entrega_Final_Presentacion.pptx` | Presentación de la sustentación, con notas del orador y guía de la demostración |
+| `Guion_Sustentacion_Entrega_Final.docx` | Guion de la sustentación y banco de preguntas |
 | `dashboard/index.html` | Panel interactivo autocontenido: el modelo desplegado corre en el navegador (abrir el archivo en cualquier navegador). Se regenera con `python dashboard/construir_dashboard.py` |
-| `Entrega_Final_Notebook.ipynb` | **Código de la entrega final**: simulación recalibrada, comparación y estabilidad en 5 edificios, selección del modelo final, objetivos del artículo (incl. Método II), interpretación, robustez y modelo desplegado |
+| `Entrega_Final_Notebook.ipynb` | **Código de la entrega final**: simulación recalibrada, comparación y estabilidad en 5 réplicas de la simulación, selección del modelo final por validación cruzada, objetivos del artículo (incl. Método II), interpretación, robustez y modelo desplegado |
 | `app.py` | **Despliegue**: aplicación Streamlit que recibe lecturas RSSI y devuelve la zona estimada |
 | `qaknn/` | Simulador y extracción de cuartiles, compartidos por el notebook y la app |
 | `modelo/` | Pipeline final (`modelo_final.joblib`) y sus metadatos |
@@ -32,7 +33,7 @@ streamlit run app.py
 Se abre en el navegador (`http://localhost:8501`). Tiene tres formas de entrada: simular una visita en una zona,
 cargar un CSV de lecturas (columnas `AP1` … `AP8`, una fila por lectura, en dBm) o escribir los cuartiles a mano.
 El modelo se guardó con scikit-learn 1.9.1; para cargarlo hay que usar esa misma versión.
-Para regenerar el modelo: `jupyter nbconvert --to notebook --execute --inplace Entrega_Final_Notebook.ipynb` (~3 min).
+Para regenerar el modelo: `jupyter nbconvert --to notebook --execute --inplace Entrega_Final_Notebook.ipynb` (3 a 10 min, según el equipo).
 
 ## Segunda entrega
 

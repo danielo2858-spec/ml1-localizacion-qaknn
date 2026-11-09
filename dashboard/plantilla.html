@@ -273,9 +273,9 @@ footer a { color: var(--accent); }
         <p class="nota" id="nota-acc"></p>
       </div>
       <div class="panel">
-        <h3>Cinco edificios simulados distintos</h3>
-        <p class="sub">El mismo entrenamiento y prueba en edificios con otra disposición de sombras. Pase el cursor sobre un punto para ver el edificio.</p>
-        <svg class="grafico" id="g-edif" viewBox="0 0 560 300" role="img" aria-label="Acierto por modelo en cinco edificios"></svg>
+        <h3>Cinco réplicas de la simulación</h3>
+        <p class="sub">Mismo plano y mismos APs, con otra sombra espacial; una de las cinco es la original. Pase el cursor sobre un punto para ver la réplica.</p>
+        <svg class="grafico" id="g-edif" viewBox="0 0 560 300" role="img" aria-label="Acierto por modelo en cinco réplicas de la simulación"></svg>
         <p class="nota" id="nota-edif"></p>
       </div>
     </div>
@@ -299,7 +299,7 @@ footer a { color: var(--accent); }
         <svg class="grafico" id="g-imp" viewBox="0 0 560 300" role="img" aria-label="Importancia por punto de acceso"></svg>
       </div>
       <div class="panel">
-        <h3>¿Mediana o cuartiles?</h3>
+        <h3>¿Media o cuartiles?</h3>
         <div class="seg conmutador" role="group" aria-label="Fuente de los datos">
           <button data-fuente="Sim. calibrada" aria-pressed="true">Simulación calibrada</button>
           <button data-fuente="Real (artículo)" aria-pressed="false">Datos reales del artículo</button>
@@ -347,6 +347,7 @@ const X = Float32Array.from(M.x_mil, v => v / 1000);
 const NTR = M.y.length;
 const fmt = (v, d = 1) => Number.isFinite(v) ? v.toFixed(d) : "—";
 const pct = (v, d = 1) => (v * 100).toFixed(d) + " %";
+const mediaRep = (ed, k) => ["42", "7", "123", "2024", "31415"].reduce((a, s) => a + ed[s][k], 0) / 5;
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 
 /* ---------------- simulador (puerto de qaknn/simulacion.py) ---------------- */
@@ -705,11 +706,11 @@ function gEdificios() {
     const k = ed.Modelo.indexOf(n), y = y0 + i * paso, col = COLOR[n];
     const vals = semillas.map(sm => ed[sm][k]);
     texto(s, 0, y + 4, n, "lbl");
-    texto(s, 0, y + 18, `media ${pct(ed.media[k])} · 1.º en ${ed["veces 1.º"][k]} de 5`, "lbl-2");
+    texto(s, 0, y + 18, `media ${pct(mediaRep(ed, k))} · 1.º en ${ed["veces 1.º"][k]} de 5`, "lbl-2");
     el("line", { x1: x(Math.min(...vals)), x2: x(Math.max(...vals)), y1: y, y2: y, style: `stroke:${col};stroke-width:2;opacity:.5` }, s);
-    vals.forEach((v, j) => { const c = el("circle", { cx: x(v), cy: y, r: 5, style: `fill:${col};stroke:var(--surface);stroke-width:1.5` }, s); c.dataset.tip = `${n} · edificio ${j + 1} (semilla ${semillas[j]}): ${pct(v)}`; });
+    vals.forEach((v, j) => { const c = el("circle", { cx: x(v), cy: y, r: 5, style: `fill:${col};stroke:var(--surface);stroke-width:1.5` }, s); c.dataset.tip = `${n} · réplica ${j + 1} (semilla ${semillas[j]}): ${pct(v)}`; });
   });
-  document.getElementById("nota-edif").innerHTML = `kNN queda <b>primero en los 5 edificios</b> (${pct(ed.media[ed.Modelo.indexOf("kNN")])} ± ${pct(ed.DE[ed.Modelo.indexOf("kNN")])}). El resultado no depende de un edificio particular.`;
+  document.getElementById("nota-edif").innerHTML = `kNN queda <b>primero en las 5 réplicas</b> (${pct(mediaRep(ed, ed.Modelo.indexOf("kNN")))} ± ${pct(ed.DE[ed.Modelo.indexOf("kNN")])}). El resultado no depende de una sombra particular, pero esto no prueba que se sostenga en otro edificio.`;
 }
 function tablaModelos() {
   const ed = R.estabilidad, hip = { "kNN": "k = 1 · Manhattan", "Naive Bayes": "var_smoothing = 10⁻³", "Logística Ridge (L2)": "C = 10", "Logística Lasso (L1)": "C = 3", "LDA": "shrinkage automático", "QDA": "reg_param = 0.05", "Línea base": "clase mayoritaria" };
@@ -718,9 +719,9 @@ function tablaModelos() {
     const grupo = n === "Línea base" ? "" : `<span class="tag ${c.grupo === "curso" ? "curso" : "expl"}">${c.grupo === "curso" ? "curso" : "exploración"}</span>`;
     return `<tr class="${n === "kNN" ? "final" : ""}"><td><span class="punto-mod" style="background:${COLOR[n]}"></span><b>${n}</b>${n === "kNN" ? " · modelo final" : ""}</td><td>${grupo}</td><td>${hip[n]}</td>
       <td class="num">${pct(c.acc)} ± ${pct(c.acc_sd)}</td><td class="num">${pct(c.acc_te)}</td><td class="num">${pct(c.acc_ic[0])}–${pct(c.acc_ic[1])}</td>
-      <td class="num">${fmt(c.me_te, 2)} m</td><td class="num">${k >= 0 ? pct(ed.media[k]) : "—"}</td></tr>`;
+      <td class="num">${fmt(c.me_te, 2)} m</td><td class="num">${k >= 0 ? pct(mediaRep(ed, k)) : "—"}</td></tr>`;
   }).join("");
-  document.getElementById("tabla-mod").innerHTML = `<thead><tr><th>Modelo</th><th>Grupo</th><th>Hiperparámetros</th><th style="text-align:right">Acierto CV</th><th style="text-align:right">Acierto prueba</th><th style="text-align:right">IC 95 %</th><th style="text-align:right">Error medio</th><th style="text-align:right">5 edificios</th></tr></thead><tbody>${filas}</tbody>`;
+  document.getElementById("tabla-mod").innerHTML = `<thead><tr><th>Modelo</th><th>Grupo</th><th>Hiperparámetros</th><th style="text-align:right">Acierto CV</th><th style="text-align:right">Acierto prueba</th><th style="text-align:right">IC 95 %</th><th style="text-align:right">Error entre centros</th><th style="text-align:right">5 réplicas</th></tr></thead><tbody>${filas}</tbody>`;
 }
 function gImportancia() {
   const s = document.getElementById("g-imp"); s.replaceChildren();
@@ -758,8 +759,8 @@ function gRepresentacion() {
   });
   const d = R.dif_cuartiles_media[fuenteRep]["2"];
   const txt = {
-    "Sim. calibrada": `Resumir lecturas sí ayuda frente a una lectura cruda, pero <b>la mediana sola rinde igual que los tres cuartiles</b> (diferencia cuartiles − media con 2 APs: ${(d[0] * 100).toFixed(1)} ± ${(d[1] * 100).toFixed(1)} pp). Basta 1 valor por AP: 8 variables en lugar de 24.`,
-    "Real (artículo)": `En las mediciones reales de los autores pasa lo mismo: cuartiles y media empatan (${(d[0] * 100).toFixed(1)} ± ${(d[1] * 100).toFixed(1)} pp con 2 APs) y con 4 APs todas las representaciones resumidas llegan al 100 %.`,
+    "Sim. calibrada": `Resumir lecturas sí ayuda frente a una lectura cruda, pero <b>los cuartiles empatan con la media</b> (diferencia con 2 APs: ${(d[0] * 100).toFixed(1)} ± ${(d[1] * 100).toFixed(1)} pp). Cautela: en esta simulación la fluctuación es igual en todo el piso, así que Q1 y Q3 no pueden aportar información de obstáculos, por construcción.`,
+    "Real (artículo)": `En las mediciones reales de los autores pasa lo mismo: cuartiles y media empatan (${(d[0] * 100).toFixed(1)} ± ${(d[1] * 100).toFixed(1)} pp con 2 APs) y con 4 APs todas las representaciones resumidas llegan al 100 %. Con 2 y 3 APs, los cuartiles sí superan a la mediana.`,
     "Sim. paredes (E2)": `Solo con la dispersión inflada de la Segunda entrega los cuartiles superan a la media con 2 APs (+${(d[0] * 100).toFixed(1)} pp). Por eso esa ventaja se trató como un artefacto del escenario.`,
   };
   document.getElementById("nota-rep").innerHTML = txt[fuenteRep];
@@ -818,9 +819,9 @@ function tablaCal() {
 function kpis() {
   const k = COMP.kNN, caida = Object.values(R.robustez.caida_ap), ed = R.estabilidad;
   const items = [
-    ["destaca", pct(k.acc_te), "acierto de zona", `IC 95 % ${pct(k.acc_ic[0])}–${pct(k.acc_ic[1])} · kNN, k = 1`],
-    ["", `${fmt(k.me_te, 2)} <small>m</small>`, "error medio de localización", `línea base: ${fmt(COMP["Línea base"].me_te, 1)} m`],
-    ["", `${ed["veces 1.º"][ed.Modelo.indexOf("kNN")]} <small>/ 5</small>`, "edificios donde kNN gana", "frente a 5 modelos alternativos"],
+    ["destaca", pct(k.acc_te), "acierto de zona", `simulación · IC 95 % ${pct(k.acc_ic[0])}–${pct(k.acc_ic[1])} · kNN, k = 1`],
+    ["", `${fmt(k.me_te, 2)} <small>m</small>`, "error entre centros de zona", `frente a la posición real: ~${fmt(R.metodos[0][1], 1)} m`],
+    ["", `${ed["veces 1.º"][ed.Modelo.indexOf("kNN")]} <small>/ 5</small>`, "réplicas donde kNN gana", "frente a 5 modelos alternativos"],
     ["", `${Math.round(Math.min(...caida) * 100)}–${Math.round(Math.max(...caida) * 100)} <small>%</small>`, "con un AP apagado", "imputación por mediana"],
     ["", pct(R.robustez.lecturas["5"], 0), "con solo 5 lecturas por AP", "frente a 40 del artículo"],
   ];
