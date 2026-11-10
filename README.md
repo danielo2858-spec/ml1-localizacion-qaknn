@@ -1,39 +1,39 @@
-# Localización interior mediante RSSI WiFi y kNN
+# Localización interior mediante RSSI WiFi y cuartiles
 
 **Proyecto Integrador · Machine Learning I · Universidad Externado de Colombia**
 Sebastián Ramos · Daniel Cipagauta — Prof. Diana Pulido
 
 Reconstrucción del artículo *QA-kNN: Indoor Localization Based on Quartile Analysis and the kNN Classifier for Wireless Networks*
-(Ferreira, Souza y Carvalho, 2020, *Sensors* 20(17), 4714, [doi:10.3390/s20174714](https://doi.org/10.3390/s20174714)) sobre un piso
-simulado de un edificio universitario colombiano: predecir la zona (18 clases) en la que está un dispositivo a partir de los
-cuartiles Q1, Q2 y Q3 del RSSI de 8 puntos de acceso.
+(Ferreira, Souza y Carvalho, 2020, *Sensors* 20(17), 4714, [doi:10.3390/s20174714](https://doi.org/10.3390/s20174714)).
+La entrega final usa **datos reales**: el dataset MNAV, con escaneos WiFi de las 16 salas del Museo Nacional de Artes Visuales
+de Montevideo (Uruguay). El objetivo es predecir la sala a partir de los cuartiles Q1, Q2 y Q3 del RSSI de varios escaneos.
 
 ## Entrega final
 
 | Ruta | Contenido |
 |---|---|
 | `Entrega_Final_Informe.docx` | Informe de la entrega final (Fase 3: consolidación, interpretación y comunicación) |
-| `Entrega_Final_Presentacion.pptx` | Presentación de la sustentación, con notas del orador y guía de la demostración |
+| `Entrega_Final_Presentacion.pptx` | Presentación de la sustentación, con notas del orador |
 | `Guion_Sustentacion_Entrega_Final.docx` | Guion de la sustentación y banco de preguntas |
-| `dashboard/index.html` | Panel interactivo autocontenido: el modelo desplegado corre en el navegador (abrir el archivo en cualquier navegador). Se regenera con `python dashboard/construir_dashboard.py` |
-| `Entrega_Final_Notebook.ipynb` | **Código de la entrega final**: simulación recalibrada, comparación y estabilidad en 5 réplicas de la simulación, selección del modelo final por validación cruzada, objetivos del artículo (incl. Método II), interpretación, robustez y modelo desplegado |
-| `app.py` | **Despliegue**: aplicación Streamlit que recibe lecturas RSSI y devuelve la zona estimada |
-| `qaknn/` | Simulador y extracción de cuartiles, compartidos por el notebook y la app |
-| `modelo/` | Pipeline final (`modelo_final.joblib`) y sus metadatos |
-| `figuras_final/`, `resultados_final.json` | Figuras y cifras de la entrega final |
-| `datos/dataset_final_calibrado.csv` | Dataset final (simulación calibrada) |
-
-### Ejecutar la aplicación
+| `Entrega_Final_Notebook.ipynb` | **Código de la entrega final**: limpieza, partición sin fuga, comparación de modelos del curso, estabilidad, selección por validación cruzada, objetivos del artículo, interpretación y robustez |
+| `datos_mnav/` | Dataset MNAV (`anonym.csv`) y su licencia MIT. Fuente: [ffedee7/posifi_mnav](https://github.com/ffedee7/posifi_mnav) |
+| `figuras_final/`, `resultados_final.json` | Figuras y cifras de la entrega final, generadas por el notebook |
 
 ```bash
 pip install -r requirements.txt
-streamlit run app.py
+jupyter nbconvert --to notebook --execute --inplace Entrega_Final_Notebook.ipynb   # ~3 min, SEED = 42
 ```
 
-Se abre en el navegador (`http://localhost:8501`). Tiene tres formas de entrada: simular una visita en una zona,
-cargar un CSV de lecturas (columnas `AP1` … `AP8`, una fila por lectura, en dBm) o escribir los cuartiles a mano.
-El modelo se guardó con scikit-learn 1.9.1; para cargarlo hay que usar esa misma versión.
-Para regenerar el modelo: `jupyter nbconvert --to notebook --execute --inplace Entrega_Final_Notebook.ipynb` (3 a 10 min, según el equipo).
+Si falta `datos_mnav/anonym.csv`, el notebook lo descarga del repositorio original.
+
+**Resultado principal (4 APs):** QDA con shrinkage, F1-macro 0.959 ± 0.007 en validación cruzada y 0.964 en prueba
+(acierto 95.2 %, línea base 10.9 %). Con los 20 APs frecuentes todos los modelos llegan a ~100 %.
+
+### Versión anterior (simulada)
+
+`app.py`, `dashboard/`, `qaknn/`, `modelo/` y `datos/dataset_final_calibrado.csv` corresponden a una versión anterior de la
+entrega final basada en un edificio simulado. La profesora pidió trabajar con datos reales, así que **no forman parte de la
+entrega final**; se conservan como registro del trabajo.
 
 ## Segunda entrega
 
